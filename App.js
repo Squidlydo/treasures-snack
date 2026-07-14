@@ -1,61 +1,44 @@
 // =============================================================================
 // My Neighborhood Treasures - single-file Expo Snack build
 // =============================================================================
-// HOW TO USE THIS FILE (no Node.js, no npm, no terminal required):
-//   1. In a browser, go to https://snack.expo.dev
-//   2. On the left file list, click "App.js" and select all the existing
-//      code, then delete it.
-//   3. Open THIS file directly (not a chat preview) and copy the whole
-//      thing (select all, copy), then paste it into Snack in one go.
-//   4. Snack auto-detects the imports below and installs them for you
-//      (give it 10-20 seconds after pasting - watch the bottom-left status).
-//   5. A QR code appears. Open Expo Go on your iPhone and scan it.
-//   6. To reopen later, revisit your saved Snack URL and hit "Run".
-//   NOTE: this file only uses plain ASCII characters on purpose, since some
-//   copy/paste paths mangle special characters partway through a large
-//   paste and truncate the file.
+// This project lives in a GitHub repo, imported into Snack via "Import Git
+// repository". To update the app going forward: edit this file in your
+// local repo folder (the one GitHub Desktop created), commit, and push -
+// Snack automatically re-syncs from the repo, no copy/paste needed.
+// NOTE: this file only uses plain ASCII characters on purpose - some
+// copy/paste paths mangle special characters and truncate large files.
 //
 // CHANGES IN THIS ROUND:
-//   - Restored the ZIP + UPC/SKU "check other locations" feature on the
-//     Locator tab (you were right to push back on removing it) - it now
-//     lives ALONGSIDE the always-accurate real store pin/detail card,
-//     not instead of it. The idea: if your one confirmed store is sold
-//     out, the same UPC/SKU may still be sitting at another location of
-//     the same chain. Results are clearly labeled "simulated" since none
-//     of the 4 retailers expose a free live nationwide inventory API.
-//   - Added a real best-effort photo lookup for the built-in SAMPLE
-//     deals: each one's UPC is checked against a free product database,
-//     and a real photo replaces the sample picture automatically if
-//     found. Honest caveat: the sample deals' UPCs were invented by me to
-//     look realistic, not real registered barcodes, so don't be surprised
-//     if they still show "Sample" - this machinery is what actually
-//     matters once a retailer goes live with real Apify data, since real
-//     data already carries its own real photo.
-//   - Figured out why only Home Depot showed "Apify Actor" while the
-//     other three showed "Mock (Built-in)": it was never a hardcoded
-//     default - every retailer starts on "Mock" identically. Your phone's
-//     local storage had simply kept an earlier plan choice you made while
-//     testing. Nothing was broken.
-//   - Read the real, current input/output documentation for three actual
-//     Apify Actors (Home Depot's cirkit/home-depot-product-scraper,
-//     Target's elliotpadfield/target-scraper, Costco's sian.agency/
-//     costco-data-scraper) and updated the data-fetching code to send and
-//     read their exact field names, not generic guesses. Pre-filled all
-//     three Actor IDs directly on the Merchants tab, so switching those
-//     three to "Apify Actor" now only requires adding your API token.
-//     Lowe's Actor ID is left blank on purpose - a documentation fetch
-//     for the leading Lowe's candidate timed out this session, so I'm not
-//     going to pre-fill one I can't personally verify.
-//   - Fixed a settings bug this pre-fill would have otherwise hit: if
-//     you'd already opened the Merchants tab before, your phone had saved
-//     empty Actor ID fields for Target/Lowe's/Costco, which would have
-//     silently blocked today's new pre-filled defaults from ever showing.
-//     Saved settings now only override a default when you've actually
-//     typed something in yourself.
-//   - Note: Home Depot's cirkit Actor currently shows an "Under
-//     maintenance" badge on its own Apify page. It's still pre-filled
-//     because its schema is the one I could fully verify, but check its
-//     status before relying on it - the Merchants tab note says the same.
+//   - Restored 3 more physical retailers using your real store data:
+//     Best Buy (#1413, 25525 Highway 290), Walmart (#5091, 26270
+//     Northwest Fwy), and Academy Sports + Outdoors (store number not
+//     available, so it's shown honestly as "N/A" rather than guessed).
+//     None of their addresses matched an exact Census street-level
+//     geocode (same frontage-road gap as Costco/Target before), so all
+//     three fall back to their ZIP's center point, same as those two -
+//     labeled "approximate" same as before. Since Best Buy/Walmart share
+//     a ZIP with Target, and Academy Sports shares a ZIP with Costco,
+//     each approximate pin gets a small deterministic visual nudge (a
+//     few hundred feet, seeded by store name) so overlapping pins don't
+//     hide each other on the map - this does NOT mean the location got
+//     more precise, it's purely so both pins stay individually tappable.
+//   - Added Amazon as an ONLINE-ONLY retailer - it doesn't fit this app's
+//     physical-store design (no address, no aisle, no map pin), so its
+//     deal cards show a "Ships to you" line instead of a store line, the
+//     Locator tab shows an explanatory message instead of an empty map
+//     when Amazon is selected, and its detail view links to the Amazon
+//     listing instead of "Get Directions."
+//   - Verified real input/output fields directly from each new retailer's
+//     actual Apify Actor documentation (not generic guesses) and
+//     pre-filled all 4 new Actor IDs: Best Buy (sovereigntaylor/bestbuy-
+//     scraper, $0.004/product), Walmart (junipr/walmart-scraper, $1.30
+//     per 1,000 - note: needs a residential proxy on Apify's free plan,
+//     check its page if a run comes back empty), Academy Sports
+//     (parseforge/academy-sports-outdoors-scraper, pay-per-event, has a
+//     built-in clearance filter this app now uses automatically when
+//     your search query contains "clearance"), and Amazon (junglee/
+//     amazon-crawler, $3.00 per 1,000 - the flagship, Apify-maintained
+//     Amazon Actor with 19K+ users, most trustworthy of the bunch).
 // =============================================================================
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, createContext } from 'react';
@@ -114,14 +97,32 @@ const COLORS = {
 // REAL STORE DATA (your Cypress, TX locations - not generated)
 // =============================================================================
 // Home Depot and Lowe's addresses matched an exact TIGER/Census street-level
-// geocode. Costco and Target's addresses sit on frontage-road address
-// ranges the free Census geocoder doesn't have indexed, so those two fall
-// back to their ZIP code's center point - close, but not building-exact.
+// geocode. The other five sit on frontage-road address ranges the free
+// Census geocoder doesn't have indexed, so those fall back to their ZIP
+// code's center point - close, but not building-exact. Since Best Buy and
+// Walmart share a ZIP with Target, and Academy Sports shares a ZIP with
+// Costco, a small deterministic offset (seeded by store name) is added so
+// overlapping pins stay individually tappable on the map - it does not
+// imply extra precision, just visual separation.
+const ZIP_CENTROIDS = {
+  '77429': { latitude: 29.9766, longitude: -95.6358 },
+  '77433': { latitude: 29.8836, longitude: -95.7025 },
+};
+function approxCoordFor(retailerName, zip) {
+  const centroid = ZIP_CENTROIDS[zip];
+  const seed = Array.from(retailerName).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  const angle = (seed % 360) * (Math.PI / 180);
+  const dist = 0.004; // roughly a quarter mile - just enough for separate, tappable pins
+  return { latitude: centroid.latitude + Math.sin(angle) * dist, longitude: centroid.longitude + Math.cos(angle) * dist };
+}
 const HOME_STORES = {
   'Home Depot': { storeName: 'The Home Depot', storeNumber: '6586', address: '17928 Spring Cypress Rd, Cypress, TX 77429', latitude: 29.973292, longitude: -95.688102, locationSource: 'exact' },
   "Lowe's": { storeName: "Lowe's Home Improvement", storeNumber: '2371', address: '14128 Cypress Rosehill Rd, Cypress, TX 77429', latitude: 29.971480, longitude: -95.700039, locationSource: 'exact' },
-  Costco: { storeName: 'Costco Wholesale', storeNumber: '1208', address: '26960 Northwest Fwy, Cypress, TX 77433', latitude: 29.8836, longitude: -95.7025, locationSource: 'approximate' },
-  Target: { storeName: 'Target', storeNumber: '1894', address: '25901 US-290, Cypress, TX 77429', latitude: 29.9766, longitude: -95.6358, locationSource: 'approximate' },
+  Costco: { storeName: 'Costco Wholesale', storeNumber: '1208', address: '26960 Northwest Fwy, Cypress, TX 77433', ...approxCoordFor('Costco', '77433'), locationSource: 'approximate' },
+  Target: { storeName: 'Target', storeNumber: '1894', address: '25901 US-290, Cypress, TX 77429', ...approxCoordFor('Target', '77429'), locationSource: 'approximate' },
+  'Best Buy': { storeName: 'Best Buy', storeNumber: '1413', address: '25525 Highway 290, Cypress, TX 77429', ...approxCoordFor('Best Buy', '77429'), locationSource: 'approximate' },
+  Walmart: { storeName: 'Walmart Supercenter', storeNumber: '5091', address: '26270 Northwest Fwy, Cypress, TX 77429', ...approxCoordFor('Walmart', '77429'), locationSource: 'approximate' },
+  'Academy Sports': { storeName: 'Academy Sports + Outdoors', storeNumber: 'N/A', address: '28616 U.S. 290, Cypress, TX 77433', ...approxCoordFor('Academy Sports', '77433'), locationSource: 'approximate' },
 };
 function haversineMiles(lat1, lon1, lat2, lon2) {
   if ([lat1, lon1, lat2, lon2].some((v) => typeof v !== 'number' || Number.isNaN(v))) return null;
@@ -136,7 +137,9 @@ function haversineMiles(lat1, lon1, lat2, lon2) {
 // =============================================================================
 // MOCK DATA
 // =============================================================================
-const RETAILERS = ['Home Depot', "Lowe's", 'Costco', 'Target'];
+// Amazon is intentionally excluded from HOME_STORES above (and therefore
+// from this list's store-pin logic) - it has no physical location.
+const RETAILERS = ['Home Depot', "Lowe's", 'Costco', 'Target', 'Best Buy', 'Walmart', 'Academy Sports', 'Amazon'];
 const DEAL_TYPES = { CLEARANCE: 'clearance', MARKDOWN: 'markdown', PRICE_ERROR: 'price_error' };
 const DEAL_TYPE_LABEL = { clearance: 'Clearance', markdown: 'Markdown', price_error: 'Price Error' };
 
@@ -154,7 +157,7 @@ function extractStoreNumber(storeName) {
 }
 // Aisle/SKU are still illustrative - no public API, free or paid, exposes
 // real in-store aisle placement. Store name/number/address come from your
-// real HOME_STORES data whenever the retailer is known.
+// real HOME_STORES data whenever the retailer is known and has one.
 function deriveStoreDetails(seedKey, retailer) {
   const seed = Array.from(String(seedKey)).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   const aisleLetter = String.fromCharCode(65 + (seed % 12));
@@ -177,12 +180,29 @@ const rawMockDeals = [
   { id: 'd4d', retailer: 'Costco', brand: 'Ninja', title: 'Foodi 14-in-1 Pressure Cooker & Air Fryer', upc: '096619005567', imageUrl: 'https://picsum.photos/seed/ninja4d/600/600', originalPrice: 229.99, salePrice: 149.99, dealType: DEAL_TYPES.PRICE_ERROR, postedAt: hoursAgo(1.5) },
   { id: 'd4', retailer: 'Target', brand: 'Threshold', title: 'Ceramic Table Lamp, Aqua Glaze', upc: '085239000789', imageUrl: 'https://picsum.photos/seed/lamp4/600/600', originalPrice: 45.0, salePrice: 9.0, dealType: DEAL_TYPES.CLEARANCE, postedAt: hoursAgo(1) },
   { id: 'd8', retailer: 'Target', brand: 'Cat & Jack', title: 'Kids Rain Boots, Assorted Sizes', upc: '085239001122', imageUrl: 'https://picsum.photos/seed/boots8/600/600', originalPrice: 19.99, salePrice: 4.0, dealType: DEAL_TYPES.CLEARANCE, postedAt: hoursAgo(30) },
+  { id: 'd5', retailer: 'Best Buy', brand: 'Samsung', title: '55" QLED 4K Smart TV', upc: '887276543210', imageUrl: 'https://picsum.photos/seed/tv5/600/600', originalPrice: 799.99, salePrice: 449.99, dealType: DEAL_TYPES.CLEARANCE, postedAt: hoursAgo(3) },
+  { id: 'd5b', retailer: 'Best Buy', brand: 'Bose', title: 'QuietComfort Wireless Headphones', upc: '017817827094', imageUrl: 'https://picsum.photos/seed/headphones5b/600/600', originalPrice: 349.0, salePrice: 199.0, dealType: DEAL_TYPES.MARKDOWN, postedAt: hoursAgo(11) },
+  { id: 'd6', retailer: 'Walmart', brand: 'Hamilton Beach', title: '6-Qt Programmable Slow Cooker', upc: '040094402070', imageUrl: 'https://picsum.photos/seed/slowcooker6/600/600', originalPrice: 39.88, salePrice: 19.0, dealType: DEAL_TYPES.CLEARANCE, postedAt: hoursAgo(14) },
+  { id: 'd6b', retailer: 'Walmart', brand: 'Mainstays', title: '5-Shelf Bookcase, Multiple Finishes', upc: '048420100001', imageUrl: 'https://picsum.photos/seed/bookcase6b/600/600', originalPrice: 44.98, salePrice: 22.0, dealType: DEAL_TYPES.MARKDOWN, postedAt: hoursAgo(20) },
+  { id: 'd7', retailer: 'Academy Sports', brand: 'Magellan Outdoors', title: '2-Person Dome Tent', upc: '888345671234', imageUrl: 'https://picsum.photos/seed/tent7/600/600', originalPrice: 59.99, salePrice: 29.99, dealType: DEAL_TYPES.CLEARANCE, postedAt: hoursAgo(8) },
+  { id: 'd7b', retailer: 'Academy Sports', brand: 'Nike', title: "Men's Revolution 7 Running Shoes", upc: '195867423810', imageUrl: 'https://picsum.photos/seed/shoes7b/600/600', originalPrice: 65.0, salePrice: 39.0, dealType: DEAL_TYPES.MARKDOWN, postedAt: hoursAgo(26) },
+  { id: 'd9', retailer: 'Amazon', brand: 'Anker', title: 'PowerCore 10000 Portable Charger', upc: '848061073823', imageUrl: 'https://picsum.photos/seed/anker9/600/600', originalPrice: 25.99, salePrice: 15.99, dealType: DEAL_TYPES.MARKDOWN, postedAt: hoursAgo(4) },
+  { id: 'd9b', retailer: 'Amazon', brand: 'Instant Pot', title: 'Duo 7-in-1 Electric Pressure Cooker', upc: '854399006979', imageUrl: 'https://picsum.photos/seed/instantpot9b/600/600', originalPrice: 99.95, salePrice: 69.0, dealType: DEAL_TYPES.PRICE_ERROR, postedAt: hoursAgo(2) },
 ];
-const mockDeals = rawMockDeals.map((d) => ({ ...d, ...deriveStoreDetails(d.id, d.retailer), isSample: true }));
+// Amazon has no physical store, so its sample deals skip HOME_STORES
+// entirely and are flagged isOnline instead of getting a store/aisle.
+const mockDeals = rawMockDeals.map((d) => {
+  if (d.retailer === 'Amazon') {
+    const seed = Array.from(String(d.id)).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    return { ...d, storeName: null, storeNumber: null, address: null, locationSource: null, aisle: null, sku: `ASIN-${100000 + (seed % 900000)}`, isSample: true, isOnline: true };
+  }
+  return { ...d, ...deriveStoreDetails(d.id, d.retailer), isSample: true, isOnline: false };
+});
 
 // Real stores to show on the map for whichever merchant(s) are selected,
 // with a genuine straight-line distance computed from your phone's actual
-// coordinates to each store's real address.
+// coordinates to each store's real address. Amazon is automatically
+// excluded since it isn't in HOME_STORES.
 function nearbyRealStores(latitude, longitude, retailer) {
   const names = retailer && retailer !== 'All' ? [retailer] : Object.keys(HOME_STORES);
   return names
@@ -211,7 +231,7 @@ function nearbyRealStores(latitude, longitude, retailer) {
 // UPC/SKU near a ZIP code - separate from the always-accurate HOME_STORES
 // pin/detail above. The point: if your one confirmed store is sold out,
 // the same item can often still be found at another location of the same
-// retailer. None of the 4 retailers expose a free live nationwide
+// retailer. None of these retailers expose a free live nationwide
 // inventory API, so these results are clearly labeled "simulated" rather
 // than presented as real-time stock.
 function mockStoresForZip(zip, upcOrSku, retailer) {
@@ -237,35 +257,47 @@ async function getLocalStock(zip, upcOrSku, retailer) {
   return mockStoresForZip(zip, upcOrSku, retailer);
 }
 
-// merchant metadata - all 4 remaining retailers have no official public
+// merchant metadata - none of these 8 retailers has an official public
 // API, so the only way to get real deal data is a paid third-party
 // source. Apify Store hosts independently-built scraper "Actors" for all
-// four, priced per-result (pay for what you use) rather than a flat
+// of them, priced per-result (pay for what you use) rather than a flat
 // monthly subscription. Apify's free plan includes $5/month of usage
 // credit with no credit card required - light personal use may cost
 // nothing at all.
 //
-// For Home Depot, Target, and Costco below, I read a specific Actor's own
+// For every retailer below except Lowe's, I read a specific Actor's own
 // documented input/output fields directly (not a guess), and the code in
-// fetchApifyActorDeals sends/reads those exact field names - so these
-// three Actor IDs are pre-filled for you already. Lowe's is left blank on
+// fetchApifyActorDeals sends/reads those exact field names - so those
+// Actor IDs are pre-filled for you already. Lowe's is left blank on
 // purpose: a documentation fetch for the leading Lowe's candidate timed
-// out this session, so I couldn't verify its real fields, and pre-filling
-// one anyway would be a guess dressed up as a fact.
+// out in an earlier session, so I couldn't verify its real fields, and
+// pre-filling one anyway would be a guess dressed up as a fact.
 const DEFAULT_ACTOR_IDS = {
   'Home Depot': 'cirkit~home-depot-product-scraper',
   Target: 'elliotpadfield~target-scraper',
   Costco: 'sian.agency~costco-data-scraper',
+  'Best Buy': 'sovereigntaylor~bestbuy-scraper',
+  Walmart: 'junipr~walmart-scraper',
+  'Academy Sports': 'parseforge~academy-sports-outdoors-scraper',
+  Amazon: 'junglee~amazon-crawler',
 };
 const HOME_DEPOT_NOTE = "Pre-filled with cirkit/home-depot-product-scraper ($3.50 per 1,000 results) - its real input/output fields are verified and matched in this app's code. Caveat: that Actor currently shows an \"Under maintenance\" badge on its own Apify page - check its status before relying on it, or browse apify.com/store and search \"home depot\" for an alternative if it stops responding.";
-const LOWES_NOTE = "No Lowe's Actor ID is pre-filled - a documentation fetch for the leading candidate timed out this session, so its real field names are unverified. Browse apify.com/store, search \"lowes\", pick one (studio-amba/lowes-scraper is a reasonable starting point but untested here), open its own \"Input\" and \"Output\" tabs to see its real field names, and paste its Actor ID below (use ~ in place of the / ).";
+const LOWES_NOTE = "No Lowe's Actor ID is pre-filled - a documentation fetch for the leading candidate timed out, so its real field names are unverified. Browse apify.com/store, search \"lowes\", pick one (studio-amba/lowes-scraper is a reasonable starting point but untested here), open its own \"Input\" and \"Output\" tabs to see its real field names, and paste its Actor ID below (use ~ in place of the / ).";
 const COSTCO_NOTE = 'Pre-filled with sian.agency/costco-data-scraper ($0.90 per 1,000 rows) - its real input/output fields are verified and matched in this app\'s code.';
 const TARGET_NOTE = 'Pre-filled with elliotpadfield/target-scraper ($2.50 per 1,000 results) - its real input/output fields are verified and matched in this app\'s code.';
+const BESTBUY_NOTE = "Pre-filled with sovereigntaylor/bestbuy-scraper ($0.004 per product, pay-per-event) - its real input/output fields are verified and matched in this app's code.";
+const WALMART_NOTE = "Pre-filled with junipr/walmart-scraper ($1.30 per 1,000 products, pay-per-event) - its real input/output fields are verified and matched in this app's code. Note: this Actor needs a residential proxy on Apify's free plan for reliable results - check its page if a run comes back empty.";
+const ACADEMY_NOTE = "Pre-filled with parseforge/academy-sports-outdoors-scraper (pay-per-event; the $5 free credit covers roughly your first 100 results) - its real input/output fields are verified and matched in this app's code. It has a built-in clearance filter this app turns on automatically when your search query contains the word \"clearance\".";
+const AMAZON_NOTE = "Pre-filled with junglee/amazon-crawler ($3.00 per 1,000 results) - the flagship, Apify-maintained Amazon Actor with 19,000+ users, the most established of any Actor in this app. Amazon has no physical stores, so this retailer's deals show no map pin or aisle - just price, photo, and a link to the listing.";
 const MERCHANTS = {
-  'Home Depot': { availablePlans: ['mock', 'paid'], paid: { label: 'Apify Actor (pay-per-result)', signupUrl: 'https://apify.com/cirkit/home-depot-product-scraper', notes: HOME_DEPOT_NOTE, fields: [{ key: 'apiKey', label: 'Apify API token (same token works for all 4 stores)' }, { key: 'apiBaseUrl', label: 'Actor ID' }, { key: 'apiSecret', label: 'Search query to check (e.g. clearance)' }] } },
-  "Lowe's": { availablePlans: ['mock', 'paid'], paid: { label: 'Apify Actor (pay-per-result)', signupUrl: 'https://apify.com/store?search=lowes', notes: LOWES_NOTE, fields: [{ key: 'apiKey', label: 'Apify API token (same token works for all 4 stores)' }, { key: 'apiBaseUrl', label: 'Actor ID (e.g. studio-amba~lowes-scraper)' }, { key: 'apiSecret', label: 'Search query to check (e.g. clearance)' }] } },
-  Costco: { availablePlans: ['mock', 'paid'], paid: { label: 'Apify Actor (pay-per-result)', signupUrl: 'https://apify.com/sian.agency/costco-data-scraper', notes: COSTCO_NOTE, fields: [{ key: 'apiKey', label: 'Apify API token (same token works for all 4 stores)' }, { key: 'apiBaseUrl', label: 'Actor ID' }, { key: 'apiSecret', label: 'Search query to check (e.g. clearance)' }] } },
-  Target: { availablePlans: ['mock', 'paid'], paid: { label: 'Apify Actor (pay-per-result)', signupUrl: 'https://apify.com/elliotpadfield/target-scraper', notes: TARGET_NOTE, fields: [{ key: 'apiKey', label: 'Apify API token (same token works for all 4 stores)' }, { key: 'apiBaseUrl', label: 'Actor ID' }, { key: 'apiSecret', label: 'Search query to check (e.g. clearance)' }] } },
+  'Home Depot': { availablePlans: ['mock', 'paid'], paid: { label: 'Apify Actor (pay-per-result)', signupUrl: 'https://apify.com/cirkit/home-depot-product-scraper', notes: HOME_DEPOT_NOTE, fields: [{ key: 'apiKey', label: 'Apify API token (same token works for all stores)' }, { key: 'apiBaseUrl', label: 'Actor ID' }, { key: 'apiSecret', label: 'Search query to check (e.g. clearance)' }] } },
+  "Lowe's": { availablePlans: ['mock', 'paid'], paid: { label: 'Apify Actor (pay-per-result)', signupUrl: 'https://apify.com/store?search=lowes', notes: LOWES_NOTE, fields: [{ key: 'apiKey', label: 'Apify API token (same token works for all stores)' }, { key: 'apiBaseUrl', label: 'Actor ID (e.g. studio-amba~lowes-scraper)' }, { key: 'apiSecret', label: 'Search query to check (e.g. clearance)' }] } },
+  Costco: { availablePlans: ['mock', 'paid'], paid: { label: 'Apify Actor (pay-per-result)', signupUrl: 'https://apify.com/sian.agency/costco-data-scraper', notes: COSTCO_NOTE, fields: [{ key: 'apiKey', label: 'Apify API token (same token works for all stores)' }, { key: 'apiBaseUrl', label: 'Actor ID' }, { key: 'apiSecret', label: 'Search query to check (e.g. clearance)' }] } },
+  Target: { availablePlans: ['mock', 'paid'], paid: { label: 'Apify Actor (pay-per-result)', signupUrl: 'https://apify.com/elliotpadfield/target-scraper', notes: TARGET_NOTE, fields: [{ key: 'apiKey', label: 'Apify API token (same token works for all stores)' }, { key: 'apiBaseUrl', label: 'Actor ID' }, { key: 'apiSecret', label: 'Search query to check (e.g. clearance)' }] } },
+  'Best Buy': { availablePlans: ['mock', 'paid'], paid: { label: 'Apify Actor (pay-per-result)', signupUrl: 'https://apify.com/sovereigntaylor/bestbuy-scraper', notes: BESTBUY_NOTE, fields: [{ key: 'apiKey', label: 'Apify API token (same token works for all stores)' }, { key: 'apiBaseUrl', label: 'Actor ID' }, { key: 'apiSecret', label: 'Search query to check (e.g. clearance)' }] } },
+  Walmart: { availablePlans: ['mock', 'paid'], paid: { label: 'Apify Actor (pay-per-result)', signupUrl: 'https://apify.com/junipr/walmart-scraper', notes: WALMART_NOTE, fields: [{ key: 'apiKey', label: 'Apify API token (same token works for all stores)' }, { key: 'apiBaseUrl', label: 'Actor ID' }, { key: 'apiSecret', label: 'Search query to check (e.g. clearance)' }] } },
+  'Academy Sports': { availablePlans: ['mock', 'paid'], paid: { label: 'Apify Actor (pay-per-result)', signupUrl: 'https://apify.com/parseforge/academy-sports-outdoors-scraper', notes: ACADEMY_NOTE, fields: [{ key: 'apiKey', label: 'Apify API token (same token works for all stores)' }, { key: 'apiBaseUrl', label: 'Actor ID' }, { key: 'apiSecret', label: 'Search query to check (e.g. clearance)' }] } },
+  Amazon: { availablePlans: ['mock', 'paid'], paid: { label: 'Apify Actor (pay-per-result)', signupUrl: 'https://apify.com/junglee/amazon-crawler', notes: AMAZON_NOTE, fields: [{ key: 'apiKey', label: 'Apify API token (same token works for all stores)' }, { key: 'apiBaseUrl', label: 'Actor ID' }, { key: 'apiSecret', label: 'Search query to check (e.g. clearance)' }] } },
 };
 function getMerchantInfo(name) {
   return MERCHANTS[name] || { availablePlans: ['mock'], notes: '' };
@@ -293,6 +325,9 @@ function formatRelativeTime(isoString) {
 }
 function buildDealDescription(deal) {
   const pct = discountPercent(deal.originalPrice, deal.salePrice);
+  if (deal.isOnline) {
+    return `Sold online at ${deal.retailer} - no physical store, ships to your address. SKU/ASIN ${deal.sku}. Originally ${formatMoney(deal.originalPrice)}, now marked down to ${formatMoney(deal.salePrice)} - ${pct}% off treasure!`;
+  }
   const addressLine = deal.address ? ` - ${deal.address}` : '';
   const approxNote = deal.locationSource === 'approximate' ? ' (approximate location - see Locator tab)' : '';
   return `Spotted at ${deal.storeName}, store #${deal.storeNumber}${addressLine}${approxNote}, aisle ${deal.aisle}. SKU ${deal.sku}. Originally ${formatMoney(deal.originalPrice)}, now marked down to ${formatMoney(deal.salePrice)} - ${pct}% off treasure!`;
@@ -327,19 +362,15 @@ async function notifyPriceAlert({ title, body }) {
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-// Calls an Apify Actor's "run and return dataset items" endpoint. The
-// input body below sends every field name that the three VERIFIED Actors
-// pre-filled on the Merchants tab actually expect (read directly from
-// each Actor's own documentation): Costco's sian.agency/costco-data-
-// scraper wants query/operation/maxPages; Home Depot's cirkit/home-depot-
-// product-scraper wants keywords as an array plus storeId/zipCode; and
-// Target's elliotpadfield/target-scraper wants searchQueries as an array
-// plus storeId/zip/state. Sending all of them at once is harmless - an
-// Actor just ignores fields it doesn't recognize - so one function works
-// across all three without per-retailer branching. If you pick a
-// different (unverified) Actor for Lowe's, check that Actor's own "Input"
-// tab and adjust the field names here in your own copy if results look
-// wrong.
+// Calls an Apify Actor's "run and return dataset items" endpoint. Amazon's
+// Actor (junglee/amazon-crawler) takes real Amazon URLs rather than a
+// keyword, and returns a different shape (nested price objects, ASIN
+// instead of UPC), so it gets its own input/output handling. Every other
+// retailer's pre-filled Actor is a search-style scraper, so one shared
+// input body/output mapping covers Home Depot, Lowe's, Costco, Target,
+// Best Buy, Walmart, and Academy Sports - it sends every field name any
+// of those Actors' own docs said they expect (harmless: an Actor just
+// ignores fields it doesn't recognize) and reads their output defensively.
 async function fetchApifyActorDeals(retailer, { apiBaseUrl, apiKey, apiSecret }) {
   const actorId = (apiBaseUrl || '').trim();
   const token = (apiKey || '').trim();
@@ -348,22 +379,34 @@ async function fetchApifyActorDeals(retailer, { apiBaseUrl, apiKey, apiSecret })
   const home = HOME_STORES[retailer];
   const zipMatch = home ? home.address.match(/\d{5}/) : null;
   const homeZip = zipMatch ? zipMatch[0] : undefined;
-  const url = `https://api.apify.com/v2/acts/${encodeURIComponent(actorId)}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+
+  let body;
+  if (retailer === 'Amazon') {
+    // junglee/amazon-crawler expects real Amazon URLs, not a keyword - a
+    // standard Amazon search URL built from the query works as one.
+    body = {
+      categoryOrProductUrls: [{ url: `https://www.amazon.com/s?k=${encodeURIComponent(query)}` }],
+      maxItemsPerStartUrl: 20,
+      zipCode: homeZip,
+      countryCode: 'US',
+    };
+  } else {
+    body = {
       query,
       search: query,
       keyword: query,
+      searchQuery: query,
       keywords: [query],
       searchQueries: [query],
       queries: [query],
+      searchTerms: [query],
       operation: 'search',
       maxPages: 1,
       maxItems: 20,
       maxProducts: 20,
       maxProductsPerQuery: 20,
+      maxResults: 20,
+      clearanceOnly: /clearance/i.test(query),
       storeId: home ? home.storeNumber : undefined,
       zipCode: homeZip,
       zip: homeZip,
@@ -371,18 +414,39 @@ async function fetchApifyActorDeals(retailer, { apiBaseUrl, apiKey, apiSecret })
       enrichPDP: true,
       includeProductDetails: true,
       fetchProductDetails: true,
-    }),
+    };
+  }
+
+  const url = `https://api.apify.com/v2/acts/${encodeURIComponent(actorId)}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`${retailer} Apify Actor responded ${res.status}`);
   const items = await res.json();
   if (!Array.isArray(items)) return [];
   return items.slice(0, 20).map((item, i) => {
-    const title = item.itemName || item.title || item.name || item.productName || 'Unknown product';
-    const brand = (Array.isArray(item.brand) ? item.brand[0] : item.brand) || retailer;
-    const salePrice = Number(item.salePrice ?? item.price ?? item.currentPrice ?? 0);
-    const originalPrice = Number(item.listPrice ?? item.originalPrice ?? item.regularPrice ?? item.price ?? salePrice);
-    const imageUrl = item.image || item.imageUrl || (Array.isArray(item.images) ? item.images[0] : null) || (Array.isArray(item.allImages) ? item.allImages[0] : null) || (Array.isArray(item.alternateImages) ? item.alternateImages[0] : null) || item.thumbnail || null;
-    const upc = String((Array.isArray(item.skus) ? item.skus[0] : null) || item.upc || item.gtin || item.itemNumber || item.itemId || item.tcin || '');
+    let title, brand, salePrice, originalPrice, imageUrl, upc;
+    if (retailer === 'Amazon') {
+      title = item.title || 'Unknown product';
+      brand = item.brand || retailer;
+      salePrice = Number(item.price?.value ?? 0);
+      originalPrice = Number(item.listPrice?.value ?? salePrice);
+      imageUrl = item.thumbnailImage || (Array.isArray(item.images) ? item.images[0] : null) || null;
+      upc = String(item.asin || '');
+    } else {
+      title = item.itemName || item.title || item.name || item.productName || 'Unknown product';
+      brand = (Array.isArray(item.brand) ? item.brand[0] : item.brand) || retailer;
+      salePrice = Number(item.salePrice ?? item.price ?? item.currentPrice ?? 0);
+      originalPrice = Number(item.listPrice ?? item.originalPrice ?? item.wasPrice ?? item.regularPrice ?? item.price ?? salePrice);
+      imageUrl = item.image || item.imageUrl || (Array.isArray(item.images) ? item.images[0] : null) || (Array.isArray(item.allImages) ? item.allImages[0] : null) || (Array.isArray(item.alternateImages) ? item.alternateImages[0] : null) || item.thumbnail || null;
+      upc = String((Array.isArray(item.skus) ? item.skus[0] : null) || item.upc || item.gtin || item.itemNumber || item.itemId || item.tcin || item.sku || item.productId || '');
+    }
+    const isOnline = retailer === 'Amazon';
+    const storeFields = isOnline
+      ? { storeName: null, storeNumber: null, address: null, locationSource: null, aisle: null, sku: upc, url: item.url || null }
+      : deriveStoreDetails(`${retailer}-${upc || i}`, retailer);
     return {
       id: `${retailer}-apify-${i}`,
       retailer,
@@ -395,7 +459,8 @@ async function fetchApifyActorDeals(retailer, { apiBaseUrl, apiKey, apiSecret })
       dealType: originalPrice > salePrice ? 'markdown' : 'clearance',
       postedAt: new Date().toISOString(),
       isSample: false,
-      ...deriveStoreDetails(`${retailer}-${upc || i}`, retailer),
+      isOnline,
+      ...storeFields,
     };
   });
 }
@@ -493,7 +558,7 @@ async function lookupUpc(upc) {
         lowestRecordedPrice: item.lowest_recorded_price || null,
         highestRecordedPrice: item.highest_recorded_price || null,
         // No retailer is known for an arbitrary scanned barcode that isn't
-        // one of our 4 sample deals, so there's no real store to attach -
+        // one of our sample deals, so there's no real store to attach -
         // storeName/storeNumber are left unset rather than guessing one.
       };
     }
@@ -600,8 +665,8 @@ function WatchlistProvider({ children }) {
           id: `w-${Date.now()}`,
           title: item.title,
           retailer,
-          storeName: item.storeName || fallbackStore.storeName,
-          storeNumber: item.storeNumber || fallbackStore.storeNumber,
+          storeName: item.storeName || (fallbackStore ? fallbackStore.storeName : null),
+          storeNumber: item.storeNumber || (fallbackStore ? fallbackStore.storeNumber : null),
           storeAddress: item.storeAddress || (fallbackStore ? fallbackStore.address : null),
           targetPrice: Number(item.targetPrice),
           currentPrice: Number(item.targetPrice) * (1.15 + Math.random() * 0.5),
@@ -678,7 +743,7 @@ function SettingsProvider({ children }) {
           // merge saved values over fresh defaults - but treat an empty
           // saved string as "never set" rather than "intentionally
           // blanked". Otherwise an empty Actor ID saved by an earlier
-          // version of this app would permanently block a newly
+          // version of this app would permanently block today's newly
           // pre-filled default from ever showing up.
           const cleanedMerchants = {};
           RETAILERS.forEach((name) => {
@@ -800,9 +865,13 @@ function DealCard({ deal, watched, onAddToWatchlist, onOpenDetail }) {
           </View>
           <Text style={[styles.dealBrand, styles.linkText]} numberOfLines={1}>{deal.brand}</Text>
           <Text style={styles.dealTitle} numberOfLines={2}>{deal.title}</Text>
-          <Text style={styles.storeLine} numberOfLines={2}>
-            {deal.storeName} #{deal.storeNumber} - Aisle {deal.aisle} - {deal.sku}
-          </Text>
+          {deal.isOnline ? (
+            <Text style={styles.storeLine} numberOfLines={1}>Ships to you - {deal.sku}</Text>
+          ) : (
+            <Text style={styles.storeLine} numberOfLines={2}>
+              {deal.storeName} #{deal.storeNumber} - Aisle {deal.aisle} - {deal.sku}
+            </Text>
+          )}
           <View style={[styles.rowBetween, { marginTop: 4 }]}>
             <Text style={styles.discountText}>{pct}% off</Text>
             <Text style={styles.timeText}>{formatRelativeTime(deal.postedAt)}</Text>
@@ -855,7 +924,11 @@ function DealDetailModal({ deal, visible, watched, onClose, onAddToWatchlist }) 
                 <Text style={[styles.discountText, { marginLeft: 12 }]}>{pct}% off</Text>
               </View>
               <Text style={[styles.mutedText, { marginTop: 16, lineHeight: 18 }]}>{buildDealDescription(deal)}</Text>
-              {deal.address ? (
+              {deal.isOnline && deal.url ? (
+                <Pressable onPress={() => Linking.openURL(deal.url)} style={{ marginTop: 8 }}>
+                  <Text style={styles.signupLink}>View on Amazon</Text>
+                </Pressable>
+              ) : deal.address ? (
                 <Pressable onPress={() => Linking.openURL(`http://maps.apple.com/?daddr=${encodeURIComponent(deal.address)}`)} style={{ marginTop: 8 }}>
                   <Text style={styles.signupLink}>Get Directions</Text>
                 </Pressable>
@@ -949,7 +1022,7 @@ function DashboardScreen() {
 const ZIP_ACCESSORY_ID = 'zipAccessory';
 
 function LocatorScreen() {
-  const { selectedMerchant } = useSettings();
+  const { selectedMerchant, setSelectedMerchant, enabledRetailers } = useSettings();
   const mapRef = useRef(null);
 
   const [deviceLocation, setDeviceLocation] = useState(null);
@@ -963,6 +1036,8 @@ function LocatorScreen() {
   const [zipError, setZipError] = useState(null);
   const [upc, setUpc] = useState('');
   const [zipStock, setZipStock] = useState([]);
+
+  const isOnlineOnlySelected = selectedMerchant === 'Amazon';
 
   useEffect(() => {
     (async () => {
@@ -987,9 +1062,10 @@ function LocatorScreen() {
   }, []);
 
   // These are always your real, fixed stores - never a randomly-generated
-  // "nearby" list - filtered to whichever merchant is selected on the
-  // Dashboard, with a genuine straight-line distance from wherever the
-  // map is currently centered.
+  // "nearby" list - filtered to whichever merchant is selected right here
+  // on the Locator tab, with a genuine straight-line distance from
+  // wherever the map is currently centered. Amazon has no entry in
+  // HOME_STORES, so it naturally returns nothing here.
   const storesToShow = useMemo(
     () => nearbyRealStores(focusedCenter?.latitude ?? 29.9766, focusedCenter?.longitude ?? -95.6358, selectedMerchant),
     [focusedCenter, selectedMerchant]
@@ -1044,66 +1120,78 @@ function LocatorScreen() {
         title="Store Locator"
         subtitle={`${selectedMerchant && selectedMerchant !== 'All' ? selectedMerchant : 'All merchants'} - your real, confirmed store location${selectedMerchant === 'All' ? 's' : ''}`}
       />
+      <MerchantDropdown label="Select Merchant" retailers={enabledRetailers} value={selectedMerchant} onChange={setSelectedMerchant} />
 
-      {Platform.OS === 'web' ? (
-        <Text style={[styles.mutedSmall, { textAlign: 'center', paddingHorizontal: 16, marginBottom: 8 }]}>
-          Note: this map only renders correctly on your iPhone through Expo Go. Snack's own browser
-          preview does not fully support this map library and may show something unrelated - please
-          check this tab on your phone, not on the snack.expo.dev website.
-        </Text>
-      ) : null}
-
-      {loadingLocation ? (
-        <View style={styles.centerFill}>
-          <ActivityIndicator color={COLORS.aqua400} />
+      {isOnlineOnlySelected ? (
+        <View style={{ paddingHorizontal: 24, paddingVertical: 32 }}>
+          <Ionicons name="cloud-outline" size={32} color={COLORS.aqua400} style={{ alignSelf: 'center', marginBottom: 8 }} />
+          <Text style={[styles.mutedText, { textAlign: 'center' }]}>
+            Amazon is online-only - there's no physical store to show here. Amazon deals appear on the Dashboard with a link to the listing instead of a map pin.
+          </Text>
         </View>
       ) : (
-        <View style={styles.mapContainer}>
-          <MapView
-            ref={mapRef}
-            provider={PROVIDER_DEFAULT}
-            style={{ flex: 1 }}
-            initialRegion={{ latitude: focusedCenter?.latitude ?? 29.9766, longitude: focusedCenter?.longitude ?? -95.6358, latitudeDelta: 0.3, longitudeDelta: 0.3 }}
-            showsUserLocation
-          >
-            {storesToShow.map((s) => (
-              <Marker
-                key={s.id}
-                coordinate={{ latitude: s.latitude, longitude: s.longitude }}
-                calloutEnabled={false}
-                pinColor={COLORS.aqua500}
-                onPress={() => setSelectedStore(s)}
-              />
-            ))}
-          </MapView>
-        </View>
-      )}
-      {locationError ? <Text style={[styles.errorText, { marginTop: 4 }]}>{locationError}</Text> : null}
+        <>
+          {Platform.OS === 'web' ? (
+            <Text style={[styles.mutedSmall, { textAlign: 'center', paddingHorizontal: 16, marginBottom: 8 }]}>
+              Note: this map only renders correctly on your iPhone through Expo Go. Snack's own browser
+              preview does not fully support this map library and may show something unrelated - please
+              check this tab on your phone, not on the snack.expo.dev website.
+            </Text>
+          ) : null}
 
-      {selectedStore ? (
-        <View style={styles.storeCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.storeName}>{selectedStore.storeName}</Text>
-            <Text style={styles.storeDistance}>
-              Store #{selectedStore.storeNumber}{selectedStore.locationSource === 'approximate' ? ' (approx. location)' : ''}
-            </Text>
-            <Text style={styles.storeDistance}>{selectedStore.address}</Text>
-            {selectedStore.distanceMiles != null ? (
-              <Text style={styles.storeDistance}>{selectedStore.distanceMiles.toFixed(1)} mi away</Text>
-            ) : null}
-            <Pressable onPress={() => Linking.openURL(`http://maps.apple.com/?daddr=${encodeURIComponent(selectedStore.address)}`)} style={{ marginTop: 4 }}>
-              <Text style={styles.signupLink}>Get Directions</Text>
-            </Pressable>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={[styles.storeStock, { color: selectedStore.stockCount > 0 ? COLORS.aqua400 : COLORS.coral500 }]}>
-              {selectedStore.stockCount > 0 ? `~${selectedStore.stockCount} in stock` : 'Out of stock'}
-            </Text>
-            <Text style={styles.mutedSmall}>(simulated - no live inventory feed)</Text>
-          </View>
-        </View>
-      ) : (
-        <Text style={[styles.mutedSmall, { textAlign: 'center', marginTop: 8 }]}>Tap a pin on the map to see its details.</Text>
+          {loadingLocation ? (
+            <View style={styles.centerFill}>
+              <ActivityIndicator color={COLORS.aqua400} />
+            </View>
+          ) : (
+            <View style={styles.mapContainer}>
+              <MapView
+                ref={mapRef}
+                provider={PROVIDER_DEFAULT}
+                style={{ flex: 1 }}
+                initialRegion={{ latitude: focusedCenter?.latitude ?? 29.9766, longitude: focusedCenter?.longitude ?? -95.6358, latitudeDelta: 0.3, longitudeDelta: 0.3 }}
+                showsUserLocation
+              >
+                {storesToShow.map((s) => (
+                  <Marker
+                    key={s.id}
+                    coordinate={{ latitude: s.latitude, longitude: s.longitude }}
+                    calloutEnabled={false}
+                    pinColor={COLORS.aqua500}
+                    onPress={() => setSelectedStore(s)}
+                  />
+                ))}
+              </MapView>
+            </View>
+          )}
+          {locationError ? <Text style={[styles.errorText, { marginTop: 4 }]}>{locationError}</Text> : null}
+
+          {selectedStore ? (
+            <View style={styles.storeCard}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.storeName}>{selectedStore.storeName}</Text>
+                <Text style={styles.storeDistance}>
+                  Store #{selectedStore.storeNumber}{selectedStore.locationSource === 'approximate' ? ' (approx. location)' : ''}
+                </Text>
+                <Text style={styles.storeDistance}>{selectedStore.address}</Text>
+                {selectedStore.distanceMiles != null ? (
+                  <Text style={styles.storeDistance}>{selectedStore.distanceMiles.toFixed(1)} mi away</Text>
+                ) : null}
+                <Pressable onPress={() => Linking.openURL(`http://maps.apple.com/?daddr=${encodeURIComponent(selectedStore.address)}`)} style={{ marginTop: 4 }}>
+                  <Text style={styles.signupLink}>Get Directions</Text>
+                </Pressable>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={[styles.storeStock, { color: selectedStore.stockCount > 0 ? COLORS.aqua400 : COLORS.coral500 }]}>
+                  {selectedStore.stockCount > 0 ? `~${selectedStore.stockCount} in stock` : 'Out of stock'}
+                </Text>
+                <Text style={styles.mutedSmall}>(simulated - no live inventory feed)</Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={[styles.mutedSmall, { textAlign: 'center', marginTop: 8 }]}>Tap a pin on the map to see its details.</Text>
+          )}
+        </>
       )}
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
@@ -1127,42 +1215,46 @@ function LocatorScreen() {
             </Pressable>
           </View>
 
-          <Text style={[styles.miniLabel, { marginTop: 16 }]}>
-            OPTIONAL: ALSO CHECK A UPC/SKU AT OTHER {selectedMerchant !== 'All' ? selectedMerchant.toUpperCase() : 'CHAIN'} LOCATIONS NEAR THAT ZIP
-          </Text>
-          <Text style={[styles.mutedSmall, { marginTop: 2 }]}>
-            Booty is booty - if your confirmed store is sold out, the same item may be sitting at another location of the same chain.
-          </Text>
-          <TextInput
-            value={upc}
-            onChangeText={setUpc}
-            placeholder="UPC or SKU from a deal card"
-            placeholderTextColor="#E8DEC680"
-            keyboardType="number-pad"
-            returnKeyType="search"
-            onSubmitEditing={handleCheckZip}
-            inputAccessoryViewID={Platform.OS === 'ios' ? ZIP_ACCESSORY_ID : undefined}
-            style={[styles.input, { marginTop: 8 }]}
-          />
-          {selectedMerchant === 'All' ? (
-            <Text style={[styles.mutedSmall, { marginTop: 6 }]}>Pick a specific merchant on the Dashboard first to check other locations.</Text>
-          ) : null}
+          {!isOnlineOnlySelected ? (
+            <>
+              <Text style={[styles.miniLabel, { marginTop: 16 }]}>
+                OPTIONAL: ALSO CHECK A UPC/SKU AT OTHER {selectedMerchant !== 'All' ? selectedMerchant.toUpperCase() : 'CHAIN'} LOCATIONS NEAR THAT ZIP
+              </Text>
+              <Text style={[styles.mutedSmall, { marginTop: 2 }]}>
+                Booty is booty - if your confirmed store is sold out, the same item may be sitting at another location of the same chain.
+              </Text>
+              <TextInput
+                value={upc}
+                onChangeText={setUpc}
+                placeholder="UPC or SKU from a deal card"
+                placeholderTextColor="#E8DEC680"
+                keyboardType="number-pad"
+                returnKeyType="search"
+                onSubmitEditing={handleCheckZip}
+                inputAccessoryViewID={Platform.OS === 'ios' ? ZIP_ACCESSORY_ID : undefined}
+                style={[styles.input, { marginTop: 8 }]}
+              />
+              {selectedMerchant === 'All' ? (
+                <Text style={[styles.mutedSmall, { marginTop: 6 }]}>Pick a specific merchant above to check other locations.</Text>
+              ) : null}
 
-          {zipStock.length > 0 ? (
-            <View style={{ marginTop: 12 }}>
-              <Text style={styles.miniLabel}>OTHER {String(selectedMerchant).toUpperCase()} LOCATIONS NEAR {zip} (SIMULATED - NO LIVE INVENTORY FEED):</Text>
-              {zipStock.map((s) => (
-                <View key={s.id} style={[styles.storeCard, { marginHorizontal: 0, marginTop: 8 }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.storeName}>{s.storeName} #{s.storeNumber}</Text>
-                    <Text style={styles.storeDistance}>{s.distanceMiles.toFixed(1)} mi away - {formatMoney(s.price)}</Text>
-                  </View>
-                  <Text style={[styles.storeStock, { color: s.stockCount > 0 ? COLORS.aqua400 : COLORS.coral500 }]}>
-                    {s.stockCount > 0 ? `~${s.stockCount} in stock` : 'Out of stock'}
-                  </Text>
+              {zipStock.length > 0 ? (
+                <View style={{ marginTop: 12 }}>
+                  <Text style={styles.miniLabel}>OTHER {String(selectedMerchant).toUpperCase()} LOCATIONS NEAR {zip} (SIMULATED - NO LIVE INVENTORY FEED):</Text>
+                  {zipStock.map((s) => (
+                    <View key={s.id} style={[styles.storeCard, { marginHorizontal: 0, marginTop: 8 }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.storeName}>{s.storeName} #{s.storeNumber}</Text>
+                        <Text style={styles.storeDistance}>{s.distanceMiles.toFixed(1)} mi away - {formatMoney(s.price)}</Text>
+                      </View>
+                      <Text style={[styles.storeStock, { color: s.stockCount > 0 ? COLORS.aqua400 : COLORS.coral500 }]}>
+                        {s.stockCount > 0 ? `~${s.stockCount} in stock` : 'Out of stock'}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
+              ) : null}
+            </>
           ) : null}
 
           {showUseMyLocation ? (
@@ -1414,6 +1506,8 @@ function MerchantCard({ name }) {
         <Text style={[styles.mutedSmall, { marginTop: 4 }]}>
           Your store: #{home.storeNumber} - {home.address}{home.locationSource === 'approximate' ? ' (approximate)' : ''}
         </Text>
+      ) : name === 'Amazon' ? (
+        <Text style={[styles.mutedSmall, { marginTop: 4 }]}>Online-only - no physical store or map pin.</Text>
       ) : null}
       <PlanPicker plans={info.availablePlans} active={cfg.plan} onChange={(plan) => updateMerchant(name, { plan })} />
       {cfg.plan !== 'paid' && info.paid?.notes ? <Text style={[styles.mutedSmall, { marginTop: 8 }]}>{info.paid.notes}</Text> : null}
@@ -1554,7 +1648,6 @@ const styles = StyleSheet.create({
   storeCard: { marginHorizontal: 16, backgroundColor: COLORS.ocean850, borderWidth: 1, borderColor: COLORS.ocean700, borderRadius: 12, padding: 12, marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   storeName: { color: COLORS.parchment, fontWeight: '600' },
   storeDistance: { color: 'rgba(232,222,198,0.5)', fontSize: 12, marginTop: 2 },
-  storePrice: { color: COLORS.gold300, fontWeight: '700' },
   storeStock: { fontSize: 12, marginTop: 2 },
   storeLine: { color: COLORS.aqua300, fontSize: 11, marginTop: 4 },
   cameraContainer: { marginHorizontal: 16, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.ocean700, height: 320 },
