@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "My Neighborhood Treasures",
+    "slug": "my-neighborhood-treasures",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#02131B",
+    "scheme": "treasures",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.squidly.myneighborhoodtreasures",
+      "infoPlist": {
+        "NSCameraUsageDescription": "My Neighborhood Treasures uses the camera to scan barcodes (UPC) so you can check items against known price drops while you're in-store.",
+        "NSLocationWhenInUseUsageDescription": "My Neighborhood Treasures can use your approximate location to center the store radius map on your ZIP code."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#02131B",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": ["CAMERA"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow My Neighborhood Treasures to use the camera to scan barcodes."
+        }
+      ]
+    ]
+  }
+}

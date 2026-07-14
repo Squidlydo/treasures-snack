@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // =============================================================================
 // My Neighborhood Treasures - single-file Expo Snack build
 // =============================================================================
@@ -63,36 +64,27 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+=======
+import './global.css';
+import { StatusBar } from 'expo-status-bar';
+>>>>>>> 5684b90b15059263a1890744bb55229814568d7f
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFonts, PirataOne_400Regular } from '@expo-google-fonts/pirata-one';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
-import * as Location from 'expo-location';
-import * as Notifications from 'expo-notifications';
+import { View, ActivityIndicator } from 'react-native';
 
-// =============================================================================
-// THEME
-// =============================================================================
-const COLORS = {
-  ocean950: '#02131B',
-  ocean900: '#04202B',
-  ocean850: '#052936',
-  ocean800: '#073344',
-  ocean700: '#0B4A5E',
-  ocean600: '#116279',
-  aqua300: '#8CEBEF',
-  aqua400: '#4DD8E0',
-  aqua500: '#1FBFD1',
-  aqua700: '#0A7F8F',
-  gold300: '#F4D58D',
-  gold400: '#E8B923',
-  parchment: '#E8DEC6',
-  coral500: '#FF6B5E',
-};
+import { WatchlistProvider } from './src/context/WatchlistContext';
+import { SettingsProvider } from './src/context/SettingsContext';
+import DashboardScreen from './src/screens/DashboardScreen';
+import LocatorScreen from './src/screens/LocatorScreen';
+import ScannerScreen from './src/screens/ScannerScreen';
+import WatchlistScreen from './src/screens/WatchlistScreen';
+import MerchantsScreen from './src/screens/MerchantsScreen';
+import { colors } from './src/theme/colors';
 
+<<<<<<< HEAD
 // =============================================================================
 // REAL STORE DATA (your Cypress, TX locations - not generated)
 // =============================================================================
@@ -1561,44 +1553,67 @@ function MerchantsScreen() {
 // =============================================================================
 // NAVIGATION ROOT
 // =============================================================================
+=======
+>>>>>>> 5684b90b15059263a1890744bb55229814568d7f
 const Tab = createBottomTabNavigator();
+
 const OceanTheme = {
   ...DarkTheme,
-  colors: { ...DarkTheme.colors, primary: COLORS.aqua400, background: COLORS.ocean950, card: COLORS.ocean900, text: COLORS.parchment, border: COLORS.ocean700, notification: COLORS.gold400 },
+  colors: {
+    ...DarkTheme.colors,
+    primary: colors.aqua400,
+    background: colors.ocean950,
+    card: colors.ocean900,
+    text: colors.parchment,
+    border: colors.ocean700,
+    notification: colors.gold400,
+  },
 };
+
 function TabIcon({ route, color, size }) {
   switch (route.name) {
-    case 'Dashboard': return <Ionicons name="compass" size={size} color={color} />;
-    case 'Locator': return <Ionicons name="map" size={size} color={color} />;
-    case 'Scanner': return <Ionicons name="barcode-outline" size={size} color={color} />;
-    case 'Watchlist': return <MaterialCommunityIcons name="treasure-chest" size={size} color={color} />;
-    case 'Merchants': return <Ionicons name="storefront-outline" size={size} color={color} />;
-    default: return null;
+    case 'Dashboard':
+      return <Ionicons name="compass" size={size} color={color} />;
+    case 'Locator':
+      return <Ionicons name="map" size={size} color={color} />;
+    case 'Scanner':
+      return <Ionicons name="barcode-outline" size={size} color={color} />;
+    case 'Watchlist':
+      return <MaterialCommunityIcons name="treasure-chest" size={size} color={color} />;
+    case 'Merchants':
+      return <Ionicons name="storefront-outline" size={size} color={color} />;
+    default:
+      return null;
   }
 }
 
 export default function App() {
   const [fontsLoaded] = useFonts({ PirataOne_400Regular });
+
   if (!fontsLoaded) {
     return (
-      <View style={[styles.screen, styles.centerFill]}>
-        <ActivityIndicator color={COLORS.aqua400} />
+      <View style={{ flex: 1, backgroundColor: colors.ocean950, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.aqua400} />
       </View>
     );
   }
+
   return (
     <SafeAreaProvider>
       <SettingsProvider>
         <WatchlistProvider>
           <NavigationContainer theme={OceanTheme}>
-            <StatusBar barStyle="light-content" />
+            <StatusBar style="light" />
             <Tab.Navigator
               screenOptions={({ route }) => ({
                 headerShown: false,
                 tabBarIcon: ({ color, size }) => <TabIcon route={route} color={color} size={size} />,
-                tabBarActiveTintColor: COLORS.gold400,
-                tabBarInactiveTintColor: COLORS.aqua700,
-                tabBarStyle: { backgroundColor: COLORS.ocean900, borderTopColor: COLORS.ocean700 },
+                tabBarActiveTintColor: colors.gold400,
+                tabBarInactiveTintColor: colors.aqua700,
+                tabBarStyle: {
+                  backgroundColor: colors.ocean900,
+                  borderTopColor: colors.ocean700,
+                },
               })}
             >
               <Tab.Screen name="Dashboard" component={DashboardScreen} />
@@ -1613,6 +1628,7 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+<<<<<<< HEAD
 
 // =============================================================================
 // STYLES
@@ -1693,3 +1709,5 @@ const styles = StyleSheet.create({
   accessoryButton: { paddingHorizontal: 12, paddingVertical: 6 },
   accessoryButtonText: { color: COLORS.parchment, fontWeight: '600', fontSize: 15 },
 });
+=======
+>>>>>>> 5684b90b15059263a1890744bb55229814568d7f
