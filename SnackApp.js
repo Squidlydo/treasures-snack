@@ -9,26 +9,17 @@
 // copy/paste paths mangle special characters and truncate large files.
 //
 // CHANGES IN THIS ROUND:
-//   - Honest correction: "exact" location source does NOT mean rooftop-
-//     accurate. The free Census geocoder matches a street ADDRESS RANGE,
-//     then interpolates a point along it - for a big-box store set back
-//     from the road (or next to a similar building in a shared plaza),
-//     that interpolation can genuinely land a couple hundred feet to a
-//     couple thousand feet off, even for a "matched" address. That's
-//     almost certainly what's behind Lowe's pointing at a neighboring
-//     building and Home Depot being off by ~2000 feet - not a code bug,
-//     a real limit of free geocoding data. The Locator screen now says
-//     this plainly instead of implying pinpoint accuracy.
-//   - Every pin on the "All merchants" map now gets its own distinct
-//     color (not one shared aqua color for all seven), plus a small
-//     color-key legend under the map - so when several stores sit close
-//     together, you can tell at a glance which pin belongs to which
-//     retailer instead of guessing by position alone.
-//   - The truly precise fix for pin accuracy: if you drop a pin on each
-//     store's actual entrance in Apple/Google Maps on your phone (long-
-//     press the map, it shows the exact coordinates), and send me those
-//     numbers, I can hard-code them directly - that would be genuinely
-//     GPS-accurate instead of relying on a free geocoder's guess.
+//   - All seven store pins now use the real GPS coordinates you dropped
+//     by hand at each store's actual entrance in Google Maps (from your
+//     "Merchants near 77433" doc). This replaces the old free-geocoder
+//     estimates entirely - Home Depot and Lowe's were previously off by
+//     up to ~2000 feet, and Costco/Target/Best Buy/Walmart/Academy Sports
+//     were only ever placed at their ZIP code's center point. All seven
+//     are now genuinely accurate, not estimated.
+//   - Every pin on the "All merchants" map still gets its own distinct
+//     color, plus a small color-key legend under the map - so when
+//     several stores sit close together, you can tell at a glance which
+//     pin belongs to which retailer instead of guessing by position.
 // =============================================================================
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, createContext } from 'react';
@@ -100,37 +91,18 @@ const PIN_COLORS = {
 // =============================================================================
 // REAL STORE DATA (your Cypress, TX locations - not generated)
 // =============================================================================
-// IMPORTANT CAVEAT: "exact" below means the free Census geocoder matched
-// a real address range on the correct street - it does NOT mean rooftop-
-// accurate. That geocoder interpolates a point along the matched address
-// range, which can still land a couple hundred to a couple thousand feet
-// from the real building, especially for big-box stores set back from
-// the road or sharing a plaza with similar buildings. "approximate"
-// entries fall back further, to their ZIP code's center point, since
-// their frontage-road address didn't match any range at all. Best Buy
-// and Walmart share a ZIP centroid with Target, and Academy Sports
-// shares one with Costco, so those four also get a small deterministic
-// offset (seeded by store name) purely so their pins don't sit exactly
-// on top of each other - it does not add real precision.
-const ZIP_CENTROIDS = {
-  '77429': { latitude: 29.9766, longitude: -95.6358 },
-  '77433': { latitude: 29.8836, longitude: -95.7025 },
-};
-function approxCoordFor(retailerName, zip) {
-  const centroid = ZIP_CENTROIDS[zip];
-  const seed = Array.from(retailerName).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  const angle = (seed % 360) * (Math.PI / 180);
-  const dist = 0.004; // roughly a quarter mile - just enough for separate, tappable pins
-  return { latitude: centroid.latitude + Math.sin(angle) * dist, longitude: centroid.longitude + Math.cos(angle) * dist };
-}
+// Coordinates below are GPS pins YOU dropped by hand at each store's real
+// entrance in Google Maps (long-press -> exact lat/long), not estimated by
+// any free geocoding service. locationSource: 'gps' reflects that - this
+// is the genuinely accurate source, not an address-range guess.
 const HOME_STORES = {
-  'Home Depot': { storeName: 'The Home Depot', storeNumber: '6586', address: '17928 Spring Cypress Rd, Cypress, TX 77429', latitude: 29.973292, longitude: -95.688102, locationSource: 'exact' },
-  "Lowe's": { storeName: "Lowe's Home Improvement", storeNumber: '2371', address: '14128 Cypress Rosehill Rd, Cypress, TX 77429', latitude: 29.971480, longitude: -95.700039, locationSource: 'exact' },
-  Costco: { storeName: 'Costco Wholesale', storeNumber: '1208', address: '26960 Northwest Fwy, Cypress, TX 77433', ...approxCoordFor('Costco', '77433'), locationSource: 'approximate' },
-  Target: { storeName: 'Target', storeNumber: '1894', address: '25901 US-290, Cypress, TX 77429', ...approxCoordFor('Target', '77429'), locationSource: 'approximate' },
-  'Best Buy': { storeName: 'Best Buy', storeNumber: '1413', address: '25525 Highway 290, Cypress, TX 77429', ...approxCoordFor('Best Buy', '77429'), locationSource: 'approximate' },
-  Walmart: { storeName: 'Walmart Supercenter', storeNumber: '5091', address: '26270 Northwest Fwy, Cypress, TX 77429', ...approxCoordFor('Walmart', '77429'), locationSource: 'approximate' },
-  'Academy Sports': { storeName: 'Academy Sports + Outdoors', storeNumber: 'N/A', address: '28616 U.S. 290, Cypress, TX 77433', ...approxCoordFor('Academy Sports', '77433'), locationSource: 'approximate' },
+  'Home Depot': { storeName: 'The Home Depot', storeNumber: '6586', address: '17928 Spring Cypress Rd, Cypress, TX 77429', latitude: 29.973393139346868, longitude: -95.69374990258363, locationSource: 'gps' },
+  "Lowe's": { storeName: "Lowe's Home Improvement", storeNumber: '2371', address: '14128 Cypress Rosehill Rd, Cypress, TX 77429', latitude: 29.971235042015216, longitude: -95.69867331520695, locationSource: 'gps' },
+  Costco: { storeName: 'Costco Wholesale', storeNumber: '1208', address: '26960 Northwest Fwy, Cypress, TX 77433', latitude: 29.97949676226675, longitude: -95.71311951894128, locationSource: 'gps' },
+  Target: { storeName: 'Target', storeNumber: '1894', address: '25901 US-290, Cypress, TX 77429', latitude: 29.969511164920903, longitude: -95.69622639245084, locationSource: 'gps' },
+  'Best Buy': { storeName: 'Best Buy', storeNumber: '1413', address: '25525 Highway 290, Cypress, TX 77429', latitude: 29.965392786984655, longitude: -95.69092704226428, locationSource: 'gps' },
+  Walmart: { storeName: 'Walmart Supercenter', storeNumber: '5091', address: '26270 Northwest Fwy, Cypress, TX 77429', latitude: 29.97592403907089, longitude: -95.69790494948329, locationSource: 'gps' },
+  'Academy Sports': { storeName: 'Academy Sports + Outdoors', storeNumber: 'N/A', address: '28616 U.S. 290, Cypress, TX 77433', latitude: 29.993325433236137, longitude: -95.74700757169933, locationSource: 'gps' },
 };
 function haversineMiles(lat1, lon1, lat2, lon2) {
   if ([lat1, lon1, lat2, lon2].some((v) => typeof v !== 'number' || Number.isNaN(v))) return null;
@@ -337,8 +309,7 @@ function buildDealDescription(deal) {
     return `Sold online at ${deal.retailer} - no physical store, ships to your address. SKU/ASIN ${deal.sku}. Originally ${formatMoney(deal.originalPrice)}, now marked down to ${formatMoney(deal.salePrice)} - ${pct}% off treasure!`;
   }
   const addressLine = deal.address ? ` - ${deal.address}` : '';
-  const approxNote = deal.locationSource === 'approximate' ? ' (approximate location - see Locator tab)' : '';
-  return `Spotted at ${deal.storeName}, store #${deal.storeNumber}${addressLine}${approxNote}, aisle ${deal.aisle}. SKU ${deal.sku}. Originally ${formatMoney(deal.originalPrice)}, now marked down to ${formatMoney(deal.salePrice)} - ${pct}% off treasure!`;
+  return `Spotted at ${deal.storeName}, store #${deal.storeNumber}${addressLine}, aisle ${deal.aisle}. SKU ${deal.sku}. Originally ${formatMoney(deal.originalPrice)}, now marked down to ${formatMoney(deal.salePrice)} - ${pct}% off treasure!`;
 }
 
 // =============================================================================
@@ -1147,9 +1118,8 @@ function LocatorScreen() {
             </Text>
           ) : null}
           <Text style={[styles.mutedSmall, { textAlign: 'center', paddingHorizontal: 16, marginBottom: 4 }]}>
-            Pins come from free public geocoding data, which can be off by anywhere from a couple
-            hundred feet to a couple thousand feet - even "matched" addresses aren't rooftop-exact.
-            Tap a pin to confirm which store it is before trusting its exact position.
+            Pins are GPS coordinates dropped by hand at each store's real entrance - not estimated.
+            Tap a pin to see store details.
           </Text>
 
           {loadingLocation ? (
@@ -1195,7 +1165,7 @@ function LocatorScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.storeName}>{selectedStore.storeName}</Text>
                 <Text style={styles.storeDistance}>
-                  Store #{selectedStore.storeNumber}{selectedStore.locationSource === 'approximate' ? ' (approx. location)' : ' (matched address, may still be off)'}
+                  Store #{selectedStore.storeNumber} (GPS-verified location)
                 </Text>
                 <Text style={styles.storeDistance}>{selectedStore.address}</Text>
                 {selectedStore.distanceMiles != null ? (
@@ -1528,7 +1498,7 @@ function MerchantCard({ name }) {
       </View>
       {home ? (
         <Text style={[styles.mutedSmall, { marginTop: 4 }]}>
-          Your store: #{home.storeNumber} - {home.address}{home.locationSource === 'approximate' ? ' (approximate)' : ''}
+          Your store: #{home.storeNumber} - {home.address} (GPS-verified)
         </Text>
       ) : name === 'Amazon' ? (
         <Text style={[styles.mutedSmall, { marginTop: 4 }]}>Online-only - no physical store or map pin.</Text>
